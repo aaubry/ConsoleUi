@@ -76,6 +76,7 @@ namespace ConsoleUi
         public string Title { get; protected set; }
         public string Description { get; set; }
         public bool IsHighlighted { get; set; }
+        public bool ShouldExit { get; set; }
 
         void IMenu.Enter()
         {

@@ -22,5 +22,6 @@ namespace ConsoleUi
         string Description { get; }
         void Enter();
 		IList<IMenuItem> Items { get; }
+        bool ShouldExit { get; }
 	}
 }

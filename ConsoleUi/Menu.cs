@@ -24,7 +24,8 @@ namespace ConsoleUi
 		public string Title { get; private set; }
 		public string Description { get; set; }
         public bool IsHighlighted { get; set; }
-		public IList<IMenuItem> Items { get; private set; }
+        public bool ShouldExit { get; set; }
+        public IList<IMenuItem> Items { get; private set; }
 		private bool _executeIfSingleItem;
 
 		public Menu(string title, params IMenuItem[] items)

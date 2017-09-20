@@ -41,9 +41,10 @@ namespace ConsoleUi.Console
 
             var pageNumber = 0;
 
-            menu.Enter();
-            while (true)
+            do
             {
+                menu.Enter();
+
                 _options = CreateOptions();
                 var totalPages = (int)Math.Ceiling((double)menu.Items.Count / _options.Count);
 
@@ -74,9 +75,8 @@ namespace ConsoleUi.Console
                 Cons.WriteLine();
 
                 ExecuteItem(choice.Item2, depth);
-                menu.Enter();
-
             }
+            while (!menu.ShouldExit);
         }
 
         private Tuple<ConsoleKeyInfo, IMenuItem> Prompt(IMenu menu, int pageNumber, int totalPages)
