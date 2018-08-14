@@ -15,7 +15,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -28,8 +27,13 @@ namespace ConsoleUi
         {
             var myType = GetType();
             Title = Regex.Replace(DescriptionHelper.Get(myType), " menu$", "");
+        }
 
+        private void CreateMenuItems(IMenuContext context)
+        {
             Items = new List<IMenuItem>();
+
+            var myType = GetType();
             foreach (var menuItemMethod in myType.GetMethods(BindingFlags.Instance | BindingFlags.Public))
             {
                 if (menuItemMethod.DeclaringType == typeof(SimpleMenu))
@@ -39,7 +43,10 @@ namespace ConsoleUi
                     continue;
 
                 var isVoid = menuItemMethod.ReturnType == typeof(void);
-                if (!isVoid && !typeof(Task).IsAssignableFrom(menuItemMethod.ReturnType))
+                var isTask = typeof(Task).IsAssignableFrom(menuItemMethod.ReturnType);
+                var isSubMenu = typeof(IMenu).IsAssignableFrom(menuItemMethod.ReturnType);
+
+                if (!isVoid && !isTask && !isSubMenu)
                     continue;
 
                 var parameters = menuItemMethod.GetParameters();
@@ -54,6 +61,19 @@ namespace ConsoleUi
                     {
                         var invokeMethod = (Action)Delegate.CreateDelegate(typeof(Action), this, menuItemMethod);
                         Items.Add(new ActionMenuItem(DescriptionHelper.Get(menuItemMethod), r => invokeMethod()));
+                    }
+                }
+                else if (isSubMenu)
+                {
+                    if (parameters.Length == 1 && parameters[0].ParameterType == typeof(IMenuContext))
+                    {
+                        var invokeMethod = (Func<IMenuContext, IMenu>)Delegate.CreateDelegate(typeof(Func<IMenuContext, IMenu>), this, menuItemMethod);
+                        Items.Add(invokeMethod(context));
+                    }
+                    else if (parameters.Length == 0)
+                    {
+                        var invokeMethod = (Func<IMenu>)Delegate.CreateDelegate(typeof(Func<IMenu>), this, menuItemMethod);
+                        Items.Add(invokeMethod());
                     }
                 }
                 else
@@ -78,12 +98,13 @@ namespace ConsoleUi
         public bool IsHighlighted { get; set; }
         public bool ShouldExit { get; set; }
 
-        void IMenu.Enter()
+        void IMenu.Enter(IMenuContext context)
         {
-            Enter();
+            CreateMenuItems(context);
+            Enter(context);
         }
 
-        protected virtual void Enter() { }
+        protected virtual void Enter(IMenuContext context) { }
 
         void IMenuItem.Execute(IMenuContext context)
         {

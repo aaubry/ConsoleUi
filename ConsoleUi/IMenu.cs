@@ -20,7 +20,7 @@ namespace ConsoleUi
     public interface IMenu : IMenuItem
 	{
         string Description { get; }
-        void Enter();
+        void Enter(IMenuContext context);
 		IList<IMenuItem> Items { get; }
         bool ShouldExit { get; }
 	}

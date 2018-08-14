@@ -23,7 +23,7 @@ namespace ConsoleUi
 		public string Title { get; private set; }
 		public bool IsHighlighted { get; set; }
 
-		public MenuItem()
+        public MenuItem()
 		{
 			Title = Regex.Replace(DescriptionHelper.Get(GetType()), " menu item$", "");
 		}

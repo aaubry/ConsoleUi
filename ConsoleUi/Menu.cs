@@ -64,7 +64,7 @@ namespace ConsoleUi
 			Items = items.ToList();
 		}
 
-        public virtual void Enter() { }
+        public virtual void Enter(IMenuContext context) { }
 
 		public virtual void Execute(IMenuContext context)
 		{

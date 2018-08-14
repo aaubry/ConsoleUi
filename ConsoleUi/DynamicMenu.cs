@@ -21,23 +21,23 @@ namespace ConsoleUi
 {
     public class DynamicMenu : Menu
 	{
-        private readonly Func<IEnumerable<IMenuItem>> getItems;
+        private readonly Func<IMenuContext, IEnumerable<IMenuItem>> getItems;
 
-        public DynamicMenu(string title, Func<IEnumerable<IMenuItem>> getItems)
+        public DynamicMenu(string title, Func<IMenuContext, IEnumerable<IMenuItem>> getItems)
             : base(title)
         {
             this.getItems = getItems;
         }
 
-        public DynamicMenu(string title, Func<Task<IEnumerable<IMenuItem>>> getItems)
-            : this(title, () => getItems().Result)
+        public DynamicMenu(string title, Func<IMenuContext, Task<IEnumerable<IMenuItem>>> getItems)
+            : this(title, ctx => getItems(ctx).Result)
         {
         }
 
-        public override void Enter()
+        public override void Enter(IMenuContext context)
         {
             Items.Clear();
-            foreach (var item in getItems())
+            foreach (var item in getItems(context))
             {
                 Items.Add(item);
             }

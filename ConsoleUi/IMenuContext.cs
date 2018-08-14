@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU General Public License
 // along with ConsoleUi.  If not, see <http://www.gnu.org/licenses/>.
 
-using System.Collections.Generic;
 
 namespace ConsoleUi
 {
-	public interface IMenuContext
+    public interface IMenuContext
 	{
 		void Run(IMenu menu);
 		IMenuUserInterface UserInterface { get; }
+        void SuppressPause();
 	}
 }

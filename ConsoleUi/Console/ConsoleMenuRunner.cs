@@ -29,7 +29,7 @@ namespace ConsoleUi.Console
                 throw new ArgumentNullException("menu");
             }
 
-            ExecuteItem(menu, 0);
+            ExecuteItem(menu, new Context(this, 0));
         }
 
         private void Run(IMenu menu, int depth)
@@ -43,7 +43,8 @@ namespace ConsoleUi.Console
 
             do
             {
-                menu.Enter();
+                var nestedContext = new Context(this, depth);
+                menu.Enter(nestedContext);
 
                 _options = CreateOptions();
                 var totalPages = (int)Math.Ceiling((double)menu.Items.Count / _options.Count);
@@ -74,7 +75,7 @@ namespace ConsoleUi.Console
                 Cons.WriteLine("Running...");
                 Cons.WriteLine();
 
-                ExecuteItem(choice.Item2, depth);
+                ExecuteItem(choice.Item2, nestedContext);
             }
             while (!menu.ShouldExit);
         }
@@ -128,17 +129,16 @@ namespace ConsoleUi.Console
             }
         }
 
-        private void ExecuteItem(IMenuItem choice, int depth)
+        private void ExecuteItem(IMenuItem choice, Context nestedContext)
         {
             if (choice == null)
             {
                 throw new ArgumentNullException("choice");
             }
 
-            var nestedRunner = new Context(this, depth);
             try
             {
-                choice.Execute(nestedRunner);
+                choice.Execute(nestedContext);
             }
             catch (CancelException err)
             {
@@ -155,7 +155,7 @@ namespace ConsoleUi.Console
                 }
             }
 
-            if (!nestedRunner.HasRun)
+            if (nestedContext.ShouldPause)
             {
                 Cons.WriteLine();
                 Cons.Write("Press [Enter] to continue... ");
@@ -338,12 +338,22 @@ namespace ConsoleUi.Console
                 _depth = depth;
             }
 
-            public bool HasRun { get; private set; }
+            private bool? shouldPause;
+
+            public bool ShouldPause => shouldPause ?? true;
 
             void IMenuContext.Run(IMenu menu)
             {
                 _menuRunner.Run(menu, _depth + 1);
-                HasRun = true;
+                if (!shouldPause.HasValue)
+                {
+                    shouldPause = false;
+                }
+            }
+
+            void IMenuContext.SuppressPause()
+            {
+                shouldPause = false;
             }
 
             IMenuUserInterface IMenuContext.UserInterface { get { return _menuRunner; } }

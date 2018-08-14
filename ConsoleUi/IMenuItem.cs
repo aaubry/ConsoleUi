@@ -21,5 +21,5 @@ namespace ConsoleUi
 		void Execute(IMenuContext context);
 
 		bool IsHighlighted { get; }
-	}
+    }
 }
