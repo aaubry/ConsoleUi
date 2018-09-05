@@ -207,8 +207,11 @@ namespace ConsoleUi.Console
             if (menu.Items.Count > 0)
             {
                 int index = 0;
-                maxLength = Math.Max(maxLength, menu.Items.Max(i => i.Title.Length));
-                foreach (var item in menu.Items.Skip(pageNumber * _options.Count).Take(_options.Count))
+
+                var page = GetItemsPage(menu, pageNumber, _options.Count);
+
+                maxLength = Math.Max(maxLength, page.Max(i => i.Title.Length));
+                foreach (var item in page)
                 {
                     var isMenu = item is IMenu;
 
@@ -236,6 +239,20 @@ namespace ConsoleUi.Console
                 {
                     Cons.WriteLine("  >  {0}", "Next".PadRight(maxLength + 1));
                 }
+            }
+        }
+
+        private IEnumerable<IMenuItem> GetItemsPage(IMenu menu, int pageNumber, int pageSize)
+        {
+            var startIndex = pageNumber * _options.Count;
+            for (int i = 0; i < pageSize; ++i)
+            {
+                var index = startIndex + i;
+                if (index >= menu.Items.Count)
+                {
+                    break;
+                }
+                yield return menu.Items[index];
             }
         }
 
