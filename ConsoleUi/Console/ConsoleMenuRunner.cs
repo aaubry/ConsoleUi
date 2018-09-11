@@ -20,7 +20,7 @@ using Cons = System.Console;
 
 namespace ConsoleUi.Console
 {
-    public sealed class ConsoleMenuRunner : IMenuRunner, IMenuUserInterface
+    public class ConsoleMenuRunner : IMenuRunner, IMenuUserInterface
     {
         public void Run(IMenu menu)
         {
@@ -32,7 +32,7 @@ namespace ConsoleUi.Console
             ExecuteItem(menu, new Context(this, 0));
         }
 
-        private void Run(IMenu menu, int depth)
+        protected virtual void Run(IMenu menu, int depth)
         {
             if (menu == null)
             {
@@ -175,7 +175,7 @@ namespace ConsoleUi.Console
 
         private bool _yesToAll;
 
-        private void Render(IMenu menu, int depth, IMenuItem selectedItem, int pageNumber, int totalPages)
+        protected virtual void Render(IMenu menu, int depth, IMenuItem selectedItem, int pageNumber, int totalPages)
         {
             if (menu == null)
             {
