@@ -46,12 +46,12 @@ namespace ConsoleUi
             this.getItems = getItems;
         }
 
-        public DynamicMenu(string title)
+        protected DynamicMenu(string title)
             : this(title, _ => Enumerable.Empty<IMenuItem>())
         {
         }
 
-        public DynamicMenu(string title, bool executeIfSingleItem)
+        protected DynamicMenu(string title, bool executeIfSingleItem)
             : this(title, executeIfSingleItem, _ => Enumerable.Empty<IMenuItem>())
         {
         }
