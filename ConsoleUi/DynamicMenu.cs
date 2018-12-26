@@ -15,43 +15,59 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace ConsoleUi
 {
     public class DynamicMenu : Menu
-	{
-        private readonly Func<IMenuContext, IEnumerable<IMenuItem>> getItems;
+    {
+        private readonly Func<IMenuContext, Task<IEnumerable<IMenuItem>>> getItems;
 
         public DynamicMenu(string title, Func<IMenuContext, IEnumerable<IMenuItem>> getItems)
+            : this(title, ctx => Task.FromResult(getItems(ctx)))
+        {
+        }
+
+        public DynamicMenu(string title, Func<IMenuContext, Task<IEnumerable<IMenuItem>>> getItems)
             : base(title)
         {
             this.getItems = getItems;
         }
 
-        public DynamicMenu(string title, Func<IMenuContext, Task<IEnumerable<IMenuItem>>> getItems)
-            : this(title, ctx => getItems(ctx).Result)
+        public DynamicMenu(string title, bool executeIfSingleItem, Func<IMenuContext, IEnumerable<IMenuItem>> getItems)
+            : this(title, executeIfSingleItem, ctx => Task.FromResult(getItems(ctx)))
         {
         }
 
-        public DynamicMenu(string title, bool executeIfSingleItem, Func<IMenuContext, IEnumerable<IMenuItem>> getItems)
+        public DynamicMenu(string title, bool executeIfSingleItem, Func<IMenuContext, Task<IEnumerable<IMenuItem>>> getItems)
             : base(title, executeIfSingleItem)
         {
             this.getItems = getItems;
         }
 
-        public DynamicMenu(string title, bool executeIfSingleItem, Func<IMenuContext, Task<IEnumerable<IMenuItem>>> getItems)
-            : this(title, executeIfSingleItem, ctx => getItems(ctx).Result)
+        public DynamicMenu(string title)
+            : this(title, _ => Enumerable.Empty<IMenuItem>())
+        {
+        }
+
+        public DynamicMenu(string title, bool executeIfSingleItem)
+            : this(title, executeIfSingleItem, _ => Enumerable.Empty<IMenuItem>())
         {
         }
 
         public override void Enter(IMenuContext context)
         {
             Items.Clear();
-            foreach (var item in getItems(context))
+            foreach (var item in GetItems(context).Result)
             {
                 Items.Add(item);
             }
+        }
+
+        protected virtual Task<IEnumerable<IMenuItem>> GetItems(IMenuContext context)
+        {
+            return getItems(context);
         }
     }
 }

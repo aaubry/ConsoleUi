@@ -1,6 +1,8 @@
 ﻿using ConsoleUi;
 using ConsoleUi.Console;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace SampleClient
 {
@@ -24,6 +26,11 @@ namespace SampleClient
         {
             return new ChoiceMenu();
         }
+
+        public IMenu DynamicChoose()
+        {
+            return new DynamicChoiceMenu();
+        }
     }
 
     public class ChoiceMenu : SimpleMenu
@@ -41,6 +48,20 @@ namespace SampleClient
         public void ChooseB()
         {
 
+        }
+    }
+
+    public class DynamicChoiceMenu : DynamicMenu
+    {
+        public DynamicChoiceMenu() : base("Dynamic choice")
+        {
+            ShouldExit = true;
+        }
+
+        protected override async Task<IEnumerable<IMenuItem>> GetItems(IMenuContext context)
+        {
+            await Task.Delay(500);
+            return new[] { new ActionMenuItem(ctx => ctx.SuppressPause()) };
         }
     }
 }
