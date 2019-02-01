@@ -15,27 +15,31 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ConsoleUi
 {
-    public abstract class SimpleMenu : IMenu
+    public abstract class SimpleMenu : DynamicMenu
     {
-        protected SimpleMenu()
+        protected SimpleMenu() : base(string.Empty)
         {
-            var myType = GetType();
-            Title = Regex.Replace(DescriptionHelper.Get(myType), " menu$", "");
+            Title = Regex.Replace(DescriptionHelper.Get(GetType()), " menu$", "");
         }
 
-        private void CreateMenuItems(IMenuContext context)
+        protected override Task<IEnumerable<IMenuItem>> LoadItems(CancellationToken cancellationToken)
         {
-            Items = new List<IMenuItem>();
+            var items = new List<IMenuItem>();
 
             var myType = GetType();
             foreach (var menuItemMethod in myType.GetMethods(BindingFlags.Instance | BindingFlags.Public))
             {
+                if (menuItemMethod.DeclaringType == typeof(MenuSkeleton))
+                    continue;
+
                 if (menuItemMethod.DeclaringType == typeof(SimpleMenu))
                     continue;
 
@@ -55,25 +59,24 @@ namespace ConsoleUi
                     if (parameters.Length == 1 && parameters[0].ParameterType == typeof(IMenuContext))
                     {
                         var invokeMethod = (Action<IMenuContext>)Delegate.CreateDelegate(typeof(Action<IMenuContext>), this, menuItemMethod);
-                        Items.Add(new ActionMenuItem(DescriptionHelper.Get(menuItemMethod), invokeMethod));
+                        items.Add(new ActionMenuItem(DescriptionHelper.Get(menuItemMethod), invokeMethod));
                     }
                     else if (parameters.Length == 0)
                     {
                         var invokeMethod = (Action)Delegate.CreateDelegate(typeof(Action), this, menuItemMethod);
-                        Items.Add(new ActionMenuItem(DescriptionHelper.Get(menuItemMethod), r => invokeMethod()));
+                        items.Add(new ActionMenuItem(DescriptionHelper.Get(menuItemMethod), ctx => invokeMethod()));
                     }
                 }
                 else if (isSubMenu)
                 {
                     if (parameters.Length == 1 && parameters[0].ParameterType == typeof(IMenuContext))
                     {
-                        var invokeMethod = (Func<IMenuContext, IMenu>)Delegate.CreateDelegate(typeof(Func<IMenuContext, IMenu>), this, menuItemMethod);
-                        Items.Add(invokeMethod(context));
+                        throw new NotSupportedException("Passing IMenuContext to a menu factory method is no longer supported");
                     }
                     else if (parameters.Length == 0)
                     {
                         var invokeMethod = (Func<IMenu>)Delegate.CreateDelegate(typeof(Func<IMenu>), this, menuItemMethod);
-                        Items.Add(invokeMethod());
+                        items.Add(invokeMethod());
                     }
                 }
                 else
@@ -81,39 +84,17 @@ namespace ConsoleUi
                     if (parameters.Length == 1 && parameters[0].ParameterType == typeof(IMenuContext))
                     {
                         var invokeMethod = (Func<IMenuContext, Task>)Delegate.CreateDelegate(typeof(Func<IMenuContext, Task>), this, menuItemMethod);
-                        Items.Add(new ActionMenuItem(DescriptionHelper.Get(menuItemMethod), invokeMethod));
+                        items.Add(new ActionMenuItem(DescriptionHelper.Get(menuItemMethod), invokeMethod));
                     }
                     else if (parameters.Length == 0)
                     {
                         var invokeMethod = (Func<Task>)Delegate.CreateDelegate(typeof(Func<Task>), this, menuItemMethod);
-                        Items.Add(new ActionMenuItem(DescriptionHelper.Get(menuItemMethod), r => invokeMethod()));
+                        items.Add(new ActionMenuItem(DescriptionHelper.Get(menuItemMethod), r => invokeMethod()));
                     }
                 }
             }
-        }
 
-        public IList<IMenuItem> Items { get; private set; }
-        public string Title { get; protected set; }
-        public string Description { get; set; }
-        public bool IsHighlighted { get; set; }
-        public bool ShouldExit { get; set; }
-
-        void IMenu.Enter(IMenuContext context)
-        {
-            CreateMenuItems(context);
-            Enter(context);
-        }
-
-        protected virtual void Enter(IMenuContext context) { }
-
-        void IMenuItem.Execute(IMenuContext context)
-        {
-            if (context == null)
-            {
-                throw new ArgumentNullException("context");
-            }
-
-            context.Run(this);
+            return Task.FromResult(items.AsEnumerable());
         }
     }
 }

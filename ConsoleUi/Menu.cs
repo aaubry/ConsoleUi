@@ -19,68 +19,26 @@ using System.Linq;
 
 namespace ConsoleUi
 {
-	public class Menu : IMenu
-	{
-		public string Title { get; private set; }
-		public string Description { get; set; }
-        public bool IsHighlighted { get; set; }
-        public bool ShouldExit { get; set; }
-        public IList<IMenuItem> Items { get; private set; }
-		private bool _executeIfSingleItem;
+    public class Menu : MenuSkeleton
+    {
+        private readonly IAsyncEnumerable<IMenuItem> items;
 
-		public Menu(string title, params IMenuItem[] items)
-			: this(title, true, items)
+        protected override IAsyncEnumerable<IMenuItem> Items => items;
+
+        public Menu(string title, params IMenuItem[] items)
+			: this(title, items.ToAsyncEnumerable())
 		{
 		}
 
-		/// <summary>
-		/// 
-		/// </summary>
-		/// <param name="title"></param>
-		/// <param name="executeIfSingleItem">
-		/// If true and the menu contains a single item, that item will be 
-		/// executed instead of rendering the menu.
-		/// </param>
-		/// <param name="items"></param>
-		public Menu(string title, bool executeIfSingleItem, params IMenuItem[] items)
-			: this(title, (IEnumerable<IMenuItem>)items)
+        public Menu(string title, IEnumerable<IMenuItem> items)
+            : this(title, items.ToAsyncEnumerable())
+        {
+        }
+
+        public Menu(string title, IAsyncEnumerable<IMenuItem> items)
+            : base(title)
 		{
-			_executeIfSingleItem = executeIfSingleItem;
-		}
-
-		public Menu(string title, IEnumerable<IMenuItem> items)
-		{
-			if (string.IsNullOrEmpty(title))
-			{
-				throw new ArgumentNullException("title");
-			}
-
-			if (items == null)
-			{
-				throw new ArgumentNullException("items");
-			}
-
-			Title = title;
-			Items = items.ToList();
-		}
-
-        public virtual void Enter(IMenuContext context) { }
-
-		public virtual void Execute(IMenuContext context)
-		{
-			if (context == null)
-			{
-				throw new ArgumentNullException("context");
-			}
-
-			if (Items.Count != 1 || !_executeIfSingleItem)
-			{
-				context.Run(this);
-			}
-			else
-			{
-				Items[0].Execute(context);
-			}
+			this.items = items ?? throw new ArgumentNullException("items");
 		}
 	}
 }

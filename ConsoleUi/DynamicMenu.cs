@@ -1,73 +1,49 @@
-// This file is part of ConsoleUi.
-//
+﻿// This file is part of ConsoleUi.
+// 
 // ConsoleUi is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-//
+// 
 // ConsoleUi is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-//
+// 
 // You should have received a copy of the GNU General Public License
 // along with ConsoleUi.  If not, see <http://www.gnu.org/licenses/>.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ConsoleUi
 {
-    public class DynamicMenu : Menu
+    public abstract class DynamicMenu : MenuSkeleton
     {
-        private readonly Func<IMenuContext, Task<IEnumerable<IMenuItem>>> getItems;
-
-        public DynamicMenu(string title, Func<IMenuContext, IEnumerable<IMenuItem>> getItems)
-            : this(title, ctx => Task.FromResult(getItems(ctx)))
+        public DynamicMenu(string title) : base(title)
         {
         }
 
-        public DynamicMenu(string title, Func<IMenuContext, Task<IEnumerable<IMenuItem>>> getItems)
-            : base(title)
+        protected override IAsyncEnumerable<IMenuItem> Items => AsyncEnumerable.CreateEnumerable(() =>
         {
-            this.getItems = getItems;
-        }
+            IEnumerator<IMenuItem> enumerator = null;
+            return AsyncEnumerable.CreateEnumerator(
+                async ct =>
+                {
+                    if (enumerator == null)
+                    {
+                        var items = await LoadItems(ct);
+                        enumerator = items.GetEnumerator();
+                    }
+                    return enumerator.MoveNext();
+                },
+                () => enumerator?.Current,
+                () => enumerator?.Dispose()
+            );
+        });
 
-        public DynamicMenu(string title, bool executeIfSingleItem, Func<IMenuContext, IEnumerable<IMenuItem>> getItems)
-            : this(title, executeIfSingleItem, ctx => Task.FromResult(getItems(ctx)))
-        {
-        }
-
-        public DynamicMenu(string title, bool executeIfSingleItem, Func<IMenuContext, Task<IEnumerable<IMenuItem>>> getItems)
-            : base(title, executeIfSingleItem)
-        {
-            this.getItems = getItems;
-        }
-
-        protected DynamicMenu(string title)
-            : this(title, _ => Enumerable.Empty<IMenuItem>())
-        {
-        }
-
-        protected DynamicMenu(string title, bool executeIfSingleItem)
-            : this(title, executeIfSingleItem, _ => Enumerable.Empty<IMenuItem>())
-        {
-        }
-
-        public override void Enter(IMenuContext context)
-        {
-            Items.Clear();
-            foreach (var item in GetItems(context).Result)
-            {
-                Items.Add(item);
-            }
-        }
-
-        protected virtual Task<IEnumerable<IMenuItem>> GetItems(IMenuContext context)
-        {
-            return getItems(context);
-        }
+        protected abstract Task<IEnumerable<IMenuItem>> LoadItems(CancellationToken cancellationToken);
     }
 }

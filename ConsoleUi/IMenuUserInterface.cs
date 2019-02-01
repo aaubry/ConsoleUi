@@ -13,12 +13,16 @@
 // You should have received a copy of the GNU General Public License
 // along with ConsoleUi.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace ConsoleUi
 {
 	public interface IMenuUserInterface
 	{
-		bool Confirm(string message, params object[] args);
-		bool Confirm(bool force, string message, params object[] args);
+		Task<bool> Confirm(string message, params object[] args);
+        Task<bool> Confirm(bool force, string message, params object[] args);
 
 		void Debug(string message, params object[] args);
 		void Info(string message, params object[] args);
@@ -26,5 +30,47 @@ namespace ConsoleUi
 		void Error(string message, params object[] args);
 
         string Prompt(string message);
-	}
+
+        Task<T> Select<T>(string message, Func<SelectionResult, (bool isValid, T selection)> choiceValidator, CancellationToken cancellationToken = default);
+
+        IProgressBar StartProgress(string status);
+    }
+
+    public interface IProgressBar : IDisposable
+    {
+        void Clear();
+        void Clear(string status);
+
+        void SetProgress(int progressPercentage);
+        void SetProgress(int progressPercentage, string status);
+
+        void SetIndeterminate();
+        void SetIndeterminate(string status);
+    }
+
+    public struct SelectionResult
+    {
+        public char SelectedCharacter { get; }
+        public PromptType Type { get; }
+
+        public SelectionResult(PromptType type)
+        {
+            Type = type;
+            SelectedCharacter = '\0';
+        }
+
+        public SelectionResult(char selectedCharacter)
+        {
+            Type = PromptType.Character;
+            SelectedCharacter = selectedCharacter;
+        }
+    }
+
+    public enum PromptType
+    {
+        None,
+        Character,
+        Cancel,
+        Accept,
+    }
 }

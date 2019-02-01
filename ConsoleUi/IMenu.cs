@@ -14,14 +14,18 @@
 // along with ConsoleUi.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace ConsoleUi
 {
     public interface IMenu : IMenuItem
 	{
         string Description { get; }
-        void Enter(IMenuContext context);
-		IList<IMenuItem> Items { get; }
+        Task Enter(IMenuContext context);
+        IAsyncEnumerable<IMenuItem> Items { get; }
         bool ShouldExit { get; }
-	}
+        bool ExecuteIfSingleItem { get; }
+
+        Task<bool> CanExit(IMenuContext context);
+    }
 }

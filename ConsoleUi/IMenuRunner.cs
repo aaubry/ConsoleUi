@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU General Public License
 // along with ConsoleUi.  If not, see <http://www.gnu.org/licenses/>.
 
-using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace ConsoleUi
 {
-	public interface IMenuRunner
+    public interface IMenuRunner
 	{
-		void Run(IMenu menu);
+		Task Run(IMenu menu);
 	}
 }

@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU General Public License
 // along with ConsoleUi.  If not, see <http://www.gnu.org/licenses/>.
 
+using System.Threading.Tasks;
+
 namespace ConsoleUi
 {
 	public interface IMenuItem
 	{
 		string Title { get; }
-		void Execute(IMenuContext context);
+		Task Execute(IMenuContext context);
 
 		bool IsHighlighted { get; }
     }

@@ -2,16 +2,17 @@
 using ConsoleUi.Console;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace SampleClient
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             var runner = new ConsoleMenuRunner();
-            runner.Run(new MainMenu());
+            await runner.Run(new MainMenu());
         }
     }
 
@@ -22,7 +23,35 @@ namespace SampleClient
             context.UserInterface.Info("Doing stuff...");
         }
 
-        public IMenu Choose(IMenuContext context)
+        public async Task DoMoreStuff(IMenuContext context)
+        {
+            await context.RunUntilCancelled(async ct =>
+            {
+                using (var progress = context.UserInterface.StartProgress("Doing stuff..."))
+                {
+                    for (int i = 0; i <= 100 && !ct.IsCancellationRequested; i++)
+                    {
+                        await Task.Delay(100, ct);
+                        progress.SetProgress(i);
+                    }
+                }
+            });
+        }
+
+        public async Task DoEvenMoreStuff(IMenuContext context)
+        {
+            await context.RunUntilCancelled(async ct =>
+            {
+                using (var progress = context.UserInterface.StartProgress("Doing stuff..."))
+                {
+                    progress.SetIndeterminate();
+                    
+                    await Task.Delay(10000, ct);
+                }
+            });
+        }
+
+        public IMenu Choose()
         {
             return new ChoiceMenu();
         }
@@ -30,6 +59,16 @@ namespace SampleClient
         public IMenu DynamicChoose()
         {
             return new DynamicChoiceMenu();
+        }
+
+        public IMenu ManyOptions()
+        {
+            return new Menu("Many options", Enumerable.Range(0, 100).Select(i => new ActionMenuItem(i.ToString(), ctx => { })));
+        }
+
+        protected override Task<bool> CanExit(IMenuContext context)
+        {
+            return context.UserInterface.Confirm(true, "Exit ?");
         }
     }
 
@@ -51,17 +90,37 @@ namespace SampleClient
         }
     }
 
-    public class DynamicChoiceMenu : DynamicMenu
+    public class DynamicChoiceMenu : Menu
     {
-        public DynamicChoiceMenu() : base("Dynamic choice")
+        public DynamicChoiceMenu() : base("Dynamic choice", GetItems())
         {
             ShouldExit = true;
         }
 
-        protected override async Task<IEnumerable<IMenuItem>> GetItems(IMenuContext context)
+        private static IAsyncEnumerable<IMenuItem> GetItems()
         {
-            await Task.Delay(500);
-            return new[] { new ActionMenuItem(ctx => ctx.SuppressPause()) };
+            return AsyncEnumerable.CreateEnumerable(() =>
+            {
+                var delay = Task.Delay(500);
+                var itemReturned = false;
+                return AsyncEnumerable.CreateEnumerator<IMenuItem>(
+                    async ct =>
+                    {
+                        if (!itemReturned)
+                        {
+                            await delay;
+                            itemReturned = true;
+                            return true;
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    },
+                    () => new ActionMenuItem(ctx => ctx.SuppressPause()),
+                    () => { }
+                );
+            });
         }
     }
 }

@@ -15,6 +15,7 @@
 
 using System;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace ConsoleUi
 {
@@ -38,6 +39,6 @@ namespace ConsoleUi
 			Title = title;
 		}
 
-		public abstract void Execute(IMenuContext context);
+		public abstract Task Execute(IMenuContext context);
 	}
 }

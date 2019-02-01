@@ -13,26 +13,24 @@
 // You should have received a copy of the GNU General Public License
 // along with ConsoleUi.  If not, see <http://www.gnu.org/licenses/>.
 
+using ConsoleUi.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Cons = System.Console;
 
 namespace ConsoleUi.Console
 {
     public class ConsoleMenuRunner : IMenuRunner, IMenuUserInterface
     {
-        public void Run(IMenu menu)
+        public Task Run(IMenu menu)
         {
-            if (menu == null)
-            {
-                throw new ArgumentNullException("menu");
-            }
-
-            ExecuteItem(menu, new Context(this, 0));
+            return Run(menu, new[] { menu });
         }
 
-        protected virtual void Run(IMenu menu, int depth)
+        protected virtual async Task Run(IMenu menu, IEnumerable<IMenu> path)
         {
             if (menu == null)
             {
@@ -41,95 +39,130 @@ namespace ConsoleUi.Console
 
             var pageNumber = 0;
 
-            do
+            await menu.Enter(new Context(this, path));
+
+            using (var pages = new PaginatedAsyncSequence<IMenuItem>(menu.Items))
             {
-                var nestedContext = new Context(this, depth);
-                menu.Enter(nestedContext);
-
-                _options = CreateOptions();
-                var totalPages = (int)Math.Ceiling((double)menu.Items.Count / _options.Count);
-
-                Render(menu, depth, null, pageNumber, totalPages);
-
-                var choice = Prompt(menu, pageNumber, totalPages);
-                if (choice.Item1.Key == ConsoleKey.Escape)
+                do
                 {
-                    break;
-                }
+                    options = CreateOptions();
 
-                if (choice.Item1.KeyChar == '<')
-                {
-                    --pageNumber;
-                    continue;
-                }
-
-                if (choice.Item1.KeyChar == '>')
-                {
-                    ++pageNumber;
-                    continue;
-                }
-
-                Render(menu, depth, choice.Item2, pageNumber, totalPages);
-
-                Cons.WriteLine();
-                Cons.WriteLine("Running...");
-                Cons.WriteLine();
-
-                ExecuteItem(choice.Item2, nestedContext);
-            }
-            while (!menu.ShouldExit);
-        }
-
-        private Tuple<ConsoleKeyInfo, IMenuItem> Prompt(IMenu menu, int pageNumber, int totalPages)
-        {
-            if (menu == null)
-            {
-                throw new ArgumentNullException("menu");
-            }
-
-            Cons.WriteLine();
-            Cons.Write("Pick an option or press [Esc] to exit: ");
-
-            return Prompt((ConsoleKeyInfo key, out bool isValid) =>
-            {
-                var optionIndex = _options.IndexOf(char.ToUpperInvariant(key.KeyChar));
-                if (optionIndex >= 0)
-                {
-                    var itemIndex = optionIndex + pageNumber * _options.Count;
-                    if (itemIndex >= 0 && itemIndex < menu.Items.Count)
+                    var progressCancellation = new CancellationTokenSource();
+                    var loaderCancellation = new CancellationTokenSource();
+                    var progressTask = Task.Run(async () =>
                     {
-                        isValid = true;
-                        return Tuple.Create(key, menu.Items[itemIndex]);
+                        try
+                        {
+                            await Task.Delay(100, progressCancellation.Token);
+                            if (!progressCancellation.Token.IsCancellationRequested)
+                            {
+                                using (var progress = ((IMenuUserInterface)this).StartProgress("Loading... Press [Esc] to cancel"))
+                                {
+                                    progress.SetIndeterminate();
+                                    var result = await ((IMenuUserInterface)this).Select(null, r => (r.Type == PromptType.Cancel, r.Type), progressCancellation.Token);
+                                    if (result == PromptType.Cancel)
+                                    {
+                                        loaderCancellation.Cancel();
+                                    }
+                                }
+                            }
+                        }
+                        catch (TaskCanceledException) { }
+                    });
+
+                    var page = await pages.GetPage(pageNumber, options.Count, loaderCancellation.Token);
+                    progressCancellation.Cancel();
+                    await progressTask;
+
+                    if (menu.ExecuteIfSingleItem && page.IsFirstPage && page.Count == 1)
+                    {
+                        await ExecuteItem(page[0], new Context(this, path));
+                        break;
+                    }
+
+                    Render(menu, page, null, path);
+
+                    var (choice, item) = await Prompt(page);
+
+                    if (choice == MenuChoice.Cancel)
+                    {
+                        if (await menu.CanExit(new Context(this, path)))
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (choice == MenuChoice.PreviousPage)
+                    {
+                        --pageNumber;
+                        continue;
+                    }
+
+                    if (choice == MenuChoice.NextPage)
+                    {
+                        ++pageNumber;
+                        continue;
+                    }
+
+                    if (choice == MenuChoice.Item)
+                    {
+                        Render(menu, page, item, path);
+
+                        Cons.WriteLine();
+                        Cons.WriteLine("Running...");
+                        Cons.WriteLine();
+
+                        await ExecuteItem(item, new Context(this, path));
                     }
                 }
+                while (!menu.ShouldExit);
+            }
+        }
 
-                isValid = key.Key == ConsoleKey.Escape
-                    || (key.KeyChar == '<' && pageNumber > 0)
-                    || (key.KeyChar == '>' && pageNumber < totalPages - 1);
+        public enum MenuChoice
+        {
+            None,
+            Cancel,
+            Item,
+            PreviousPage,
+            NextPage,
+        };
 
-                return Tuple.Create(key, (IMenuItem)null);
+        private Task<(MenuChoice choice, IMenuItem item)> Prompt(Page<IMenuItem> page)
+        {
+            Cons.WriteLine();
+
+            return ((IMenuUserInterface)this).Select<(MenuChoice choice, IMenuItem item)>("Pick an option or press [Esc] to exit: ", selection =>
+            {
+                switch (selection.Type)
+                {
+                    case PromptType.Cancel:
+                        return (true, (MenuChoice.Cancel, null));
+
+                    case PromptType.Character when selection.SelectedCharacter == '<':
+                        return (!page.IsFirstPage, (MenuChoice.PreviousPage, null));
+
+                    case PromptType.Character when selection.SelectedCharacter == '>':
+                        return (!page.IsLastPage, (MenuChoice.NextPage, null));
+
+                    case PromptType.Character:
+                        var optionIndex = options.IndexOf(char.ToUpperInvariant(selection.SelectedCharacter));
+                        if (optionIndex >= 0 && optionIndex < page.Count)
+                        {
+                            return (true, (MenuChoice.Item, page[optionIndex]));
+                        }
+                        break;
+                }
+
+                return (false, (MenuChoice.None, null));
             });
         }
 
-        private delegate T ValidateKeyDelegate<T>(ConsoleKeyInfo key, out bool isValid);
-
-        private T Prompt<T>(ValidateKeyDelegate<T> validateKey)
-        {
-            while (true)
-            {
-                var key = Cons.ReadKey(true);
-                bool isValid;
-                var result = validateKey(key, out isValid);
-                if (isValid)
-                {
-                    Cons.WriteLine(key.KeyChar);
-                    Cons.WriteLine();
-                    return result;
-                }
-            }
-        }
-
-        private void ExecuteItem(IMenuItem choice, Context nestedContext)
+        private async Task ExecuteItem(IMenuItem choice, Context nestedContext)
         {
             if (choice == null)
             {
@@ -138,7 +171,7 @@ namespace ConsoleUi.Console
 
             try
             {
-                choice.Execute(nestedContext);
+                await choice.Execute(nestedContext);
             }
             catch (CancelException err)
             {
@@ -175,20 +208,24 @@ namespace ConsoleUi.Console
 
         private bool _yesToAll;
 
-        protected virtual void Render(IMenu menu, int depth, IMenuItem selectedItem, int pageNumber, int totalPages)
+        protected virtual void Render(IMenu menu, Page<IMenuItem> page, IMenuItem selectedItem, IEnumerable<IMenu> path)
         {
-            if (menu == null)
-            {
-                throw new ArgumentNullException("menu");
-            }
-
             _yesToAll = false;
             Cons.Clear();
 
             using (Color.Set(ConsoleColor.Cyan))
             {
                 Cons.WriteLine();
-                Cons.WriteLine("  {0} {1}", new string('>', depth), menu.Title);
+
+                var titleBar = "  " + string.Join(" > ", path.Select(m => m.Title));
+                var maxTitleBarLength = Cons.BufferWidth - 4;
+                if (titleBar.Length > maxTitleBarLength)
+                {
+                    titleBar = "  ... " + titleBar.Substring(titleBar.Length - maxTitleBarLength - 4);
+                }
+
+                Cons.WriteLine(titleBar);
+
                 if (menu.Description != null)
                 {
                     using (Color.Set(ConsoleColor.DarkGray))
@@ -204,11 +241,9 @@ namespace ConsoleUi.Console
 
             var maxLength = new[] { "Previous", "Next" }.Max(n => n.Length);
 
-            if (menu.Items.Count > 0)
+            if (page.Count > 0)
             {
                 int index = 0;
-
-                var page = GetItemsPage(menu, pageNumber, _options.Count);
 
                 maxLength = Math.Max(maxLength, page.Max(i => i.Title.Length));
                 foreach (var item in page)
@@ -218,7 +253,7 @@ namespace ConsoleUi.Console
                     Cons.Write(" ");
                     using (Color.Set(ConsoleColor.Yellow, ReferenceEquals(item, selectedItem) ? ConsoleColor.DarkGray : ConsoleColor.Black))
                     {
-                        Cons.Write(" {0}", _options[index++]);
+                        Cons.Write(" {0}", options[index++]);
                     }
 
                     using (Color.Set(item.IsHighlighted ? ConsoleColor.White : ConsoleColor.Gray, ReferenceEquals(item, selectedItem) ? ConsoleColor.DarkGray : ConsoleColor.Black))
@@ -238,12 +273,12 @@ namespace ConsoleUi.Console
 
             using (Color.Set(ConsoleColor.DarkGray))
             {
-                if (pageNumber > 0)
+                if (!page.IsFirstPage)
                 {
                     Cons.WriteLine("  <  {0}", "Previous".PadRight(maxLength + 1));
                 }
 
-                if (pageNumber < totalPages - 1)
+                if (!page.IsLastPage)
                 {
                     Cons.WriteLine("  >  {0}", "Next".PadRight(maxLength + 1));
                 }
@@ -255,36 +290,22 @@ namespace ConsoleUi.Console
             Cons.Write(item.Title);
         }
 
-        private IEnumerable<IMenuItem> GetItemsPage(IMenu menu, int pageNumber, int pageSize)
-        {
-            var startIndex = pageNumber * _options.Count;
-            for (int i = 0; i < pageSize; ++i)
-            {
-                var index = startIndex + i;
-                if (index >= menu.Items.Count)
-                {
-                    break;
-                }
-                yield return menu.Items[index];
-            }
-        }
-
-        bool IMenuUserInterface.Confirm(bool force, string message, params object[] args)
+        async Task<bool> IMenuUserInterface.Confirm(bool force, string message, params object[] args)
         {
             using (Color.Set(ConsoleColor.Yellow))
             {
                 if (force)
                 {
                     Cons.WriteLine();
-                    Cons.Write("{0} (y/n) ? ", string.Format(message, args).TrimEnd(' ', '?'));
+                    var formattedMessage = string.Format("{0} (y/n) ? ", string.Format(message, args).TrimEnd(' ', '?'));
 
-                    return Prompt((ConsoleKeyInfo key, out bool isValid) =>
+                    var result = await ((IMenuUserInterface)this).Select(formattedMessage, choice =>
                     {
-                        var input = char.ToLowerInvariant(key.KeyChar);
-                        isValid = "yn".Contains(input);
-
-                        return input != 'n';
+                        var lowerChoice = char.ToLowerInvariant(choice.SelectedCharacter);
+                        return ("yn".Contains(lowerChoice), lowerChoice);
                     });
+
+                    return result != 'n';
                 }
                 else
                 {
@@ -294,21 +315,21 @@ namespace ConsoleUi.Console
                     }
 
                     Cons.WriteLine();
-                    Cons.Write("{0} (y/n/a) ? ", string.Format(message, args).TrimEnd(' ', '?'));
+                    var formattedMessage = string.Format("{0} (y/n/a) ? ", string.Format(message, args).TrimEnd(' ', '?'));
 
-                    return Prompt((ConsoleKeyInfo key, out bool isValid) =>
+                    var result = await ((IMenuUserInterface)this).Select(formattedMessage, choice =>
                     {
-                        var input = char.ToLowerInvariant(key.KeyChar);
-                        isValid = "yna".Contains(input);
-
-                        _yesToAll = key.KeyChar == 'a';
-                        return input != 'n';
+                        var lowerChoice = char.ToLowerInvariant(choice.SelectedCharacter);
+                        return ("yna".Contains(lowerChoice), lowerChoice);
                     });
+
+                    _yesToAll = result == 'a';
+                    return result != 'n';
                 }
             }
         }
 
-        bool IMenuUserInterface.Confirm(string message, params object[] args)
+        Task<bool> IMenuUserInterface.Confirm(string message, params object[] args)
         {
             return ((IMenuUserInterface)this).Confirm(false, message, args);
         }
@@ -357,24 +378,200 @@ namespace ConsoleUi.Console
             }
         }
 
+        Task<T> IMenuUserInterface.Select<T>(string message, Func<SelectionResult, (bool isValid, T selection)> choiceValidator, CancellationToken cancellationToken)
+        {
+            if (message != null)
+            {
+                Cons.Write(message);
+            }
+            return Task.Run(async () =>
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    if (Cons.KeyAvailable)
+                    {
+                        var key = Cons.ReadKey(true);
+
+                        SelectionResult choice;
+                        switch (key.Key)
+                        {
+                            case ConsoleKey.Escape:
+                                choice = new SelectionResult(PromptType.Cancel);
+                                break;
+
+                            case ConsoleKey.Enter:
+                                choice = new SelectionResult(PromptType.Accept);
+                                break;
+
+                            default:
+                                choice = new SelectionResult(key.KeyChar);
+                                break;
+                        }
+
+                        var (isValid, selection) = choiceValidator(choice);
+                        if (isValid)
+                        {
+                            if (choice.Type == PromptType.Character && message != null)
+                            {
+                                Cons.WriteLine(choice.SelectedCharacter);
+                                Cons.WriteLine();
+                            }
+                            return selection;
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            await Task.Delay(100, cancellationToken);
+                        }
+                        catch (TaskCanceledException) { }
+                    }
+                }
+
+                return default;
+            });
+        }
+
+        IProgressBar IMenuUserInterface.StartProgress(string status)
+        {
+            var progress = new ProgressBar(status);
+            progress.SetProgress(0);
+            return progress;
+        }
+
+        public sealed class ProgressBar : IProgressBar
+        {
+            private string status;
+            private CancellationTokenSource animationCancellation;
+            private Task animationTask;
+
+            public ProgressBar(string status)
+            {
+                this.status = status;
+                Cons.CursorVisible = false;
+            }
+
+            public void Clear(string status)
+            {
+                this.status = status;
+                Clear();
+            }
+
+            public void Clear()
+            {
+                StopAnimation();
+                Render(status, 0, 0);
+            }
+
+            public void SetProgress(int progressPercentage, string status)
+            {
+                this.status = status;
+                SetProgress(progressPercentage);
+            }
+
+            public void SetProgress(int progressPercentage)
+            {
+                StopAnimation();
+                Render($"{status} {progressPercentage} %", 0, progressPercentage);
+            }
+
+            private void StopAnimation()
+            {
+                if (animationCancellation != null)
+                {
+                    animationCancellation.Cancel();
+                    animationTask.Wait();
+
+                    animationCancellation = null;
+                    animationTask = null;
+                }
+            }
+
+            private async Task AnimateIndeterminate(CancellationToken cancellationToken)
+            {
+                int indeterminateCycle = 0;
+                int indeterminateIncrement = 1;
+
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    Render(status, indeterminateCycle, indeterminateCycle + 10);
+                    indeterminateCycle += indeterminateIncrement;
+
+                    if (indeterminateCycle == 0 || indeterminateCycle == 90)
+                    {
+                        indeterminateIncrement = -indeterminateIncrement;
+                    }
+
+                    await Task.Delay(10);
+                }
+            }
+
+            public void SetIndeterminate(string status)
+            {
+                this.status = status;
+                SetIndeterminate();
+            }
+
+            public void SetIndeterminate()
+            {
+                if (animationCancellation == null)
+                {
+                    animationCancellation = new CancellationTokenSource();
+                    animationTask = Task.Run(() => AnimateIndeterminate(animationCancellation.Token));
+                }
+            }
+
+            private void Render(string label, int startHighlightPercentage, int endHighlightPercentage)
+            {
+                Cons.CursorLeft = 1;
+
+                var text = ("   " + label).PadRight(Cons.BufferWidth - 2);
+                var leftSplitIndex = (int)Math.Round(startHighlightPercentage * text.Length / 100.0);
+                var rightSplitIndex = (int)Math.Round(endHighlightPercentage * text.Length / 100.0);
+
+                using (Color.Set(ConsoleColor.Black, ConsoleColor.Gray))
+                {
+                    Cons.Write(text.Substring(0, leftSplitIndex));
+                }
+
+                using (Color.Set(ConsoleColor.Black, ConsoleColor.White))
+                {
+                    Cons.Write(text.Substring(leftSplitIndex, rightSplitIndex - leftSplitIndex));
+                }
+
+                using (Color.Set(ConsoleColor.Black, ConsoleColor.Gray))
+                {
+                    Cons.Write(text.Substring(rightSplitIndex));
+                }
+            }
+
+            public void Dispose()
+            {
+                StopAnimation();
+                Cons.CursorVisible = true;
+                Cons.WriteLine();
+            }
+        }
+
         private class Context : IMenuContext
         {
-            private readonly int _depth;
-            private readonly ConsoleMenuRunner _menuRunner;
+            private readonly ConsoleMenuRunner menuRunner;
+            private readonly IEnumerable<IMenu> menus;
 
-            public Context(ConsoleMenuRunner menuRunner, int depth)
+            public Context(ConsoleMenuRunner menuRunner, IEnumerable<IMenu> menus)
             {
-                _menuRunner = menuRunner;
-                _depth = depth;
+                this.menuRunner = menuRunner;
+                this.menus = menus;
             }
 
             private bool? shouldPause;
 
             public bool ShouldPause => shouldPause ?? true;
 
-            void IMenuContext.Run(IMenu menu)
+            async Task IMenuContext.Run(IMenu menu)
             {
-                _menuRunner.Run(menu, _depth + 1);
+                await menuRunner.Run(menu, menus.Concat(new[] { menu }));
                 if (!shouldPause.HasValue)
                 {
                     shouldPause = false;
@@ -386,10 +583,10 @@ namespace ConsoleUi.Console
                 shouldPause = false;
             }
 
-            IMenuUserInterface IMenuContext.UserInterface { get { return _menuRunner; } }
+            IMenuUserInterface IMenuContext.UserInterface { get { return menuRunner; } }
         }
 
-        private List<char> _options;
+        private List<char> options;
 
         private static List<char> CreateOptions()
         {

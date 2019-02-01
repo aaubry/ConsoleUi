@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with ConsoleUi.  If not, see <http://www.gnu.org/licenses/>.
 
+using System.Threading.Tasks;
+
 namespace ConsoleUi
 {
     public class ConfirmMenuItem : MenuItem
@@ -30,10 +32,12 @@ namespace ConsoleUi
 			_message = message;
 		}
 
-		public override void Execute(IMenuContext context)
+		public override async Task Execute(IMenuContext context)
 		{
-			if (!context.UserInterface.Confirm(_message))
-				throw new CancelException();
+            if (!(await context.UserInterface.Confirm(_message)))
+            {
+                throw new CancelException();
+            }
 		}
 	}
 }

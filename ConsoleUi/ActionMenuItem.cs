@@ -18,44 +18,34 @@ using System.Threading.Tasks;
 
 namespace ConsoleUi
 {
-	public sealed class ActionMenuItem : MenuItem
-	{
-		private readonly Action<IMenuContext> _execute;
+    public sealed class ActionMenuItem : MenuItem
+    {
+        private readonly Func<IMenuContext, Task> _execute;
 
-		public ActionMenuItem(Action<IMenuContext> execute)
-		{
-			if (execute == null)
-			{
-				throw new ArgumentNullException("execute");
-			}
+        public ActionMenuItem(Action<IMenuContext> execute)
+            : this(ctx => { execute(ctx); return Task.CompletedTask; })
+        {
+        }
 
-			_execute = execute;
-		}
-
-		public ActionMenuItem(string title, Action<IMenuContext> execute)
-			: base(title)
-		{
-			if (execute == null)
-			{
-				throw new ArgumentNullException("execute");
-			}
-
-			_execute = execute;
-		}
+        public ActionMenuItem(string title, Action<IMenuContext> execute)
+            : this(title, ctx => { execute(ctx); return Task.CompletedTask; })
+        {
+        }
 
         public ActionMenuItem(Func<IMenuContext, Task> execute)
-            : this(ctx => execute(ctx).Wait())
         {
+            _execute = execute ?? throw new ArgumentNullException("execute");
         }
 
         public ActionMenuItem(string title, Func<IMenuContext, Task> execute)
-            : this(title, ctx => execute(ctx).Wait())
+            : base(title)
         {
+            _execute = execute ?? throw new ArgumentNullException("execute");
         }
 
-        public override void Execute(IMenuContext context)
-		{
-			_execute(context);
-		}
-	}
+        public override Task Execute(IMenuContext context)
+        {
+            return _execute(context);
+        }
+    }
 }

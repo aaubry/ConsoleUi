@@ -16,10 +16,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace ConsoleUi
 {
-	public class CompositeMenuItem : MenuItem
+    public class CompositeMenuItem : MenuItem
 	{
 		public ICollection<IMenuItem> Items { get; private set; }
 
@@ -60,11 +61,11 @@ namespace ConsoleUi
 			Items = new List<IMenuItem>();
 		}
 
-		public override void Execute(IMenuContext context)
+		public override async Task Execute(IMenuContext context)
 		{
 			foreach (var item in Items)
 			{
-				item.Execute(context);
+				await item.Execute(context);
 			}
 		}
 	}

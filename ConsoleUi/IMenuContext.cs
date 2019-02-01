@@ -13,13 +13,61 @@
 // You should have received a copy of the GNU General Public License
 // along with ConsoleUi.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ConsoleUi
 {
     public interface IMenuContext
-	{
-		void Run(IMenu menu);
-		IMenuUserInterface UserInterface { get; }
+    {
+        Task Run(IMenu menu);
+        IMenuUserInterface UserInterface { get; }
         void SuppressPause();
-	}
+    }
+
+    public static class MenuContextExtensions
+    {
+        public static Task<T> RunUntilCancelled<T>(this IMenuContext context, Func<CancellationToken, Task<T>> backgroundTaskFactory)
+        {
+            return context.UserInterface.RunUntilCancelled(backgroundTaskFactory);
+        }
+
+        public static async Task<T> RunUntilCancelled<T>(this IMenuUserInterface userInterface, Func<CancellationToken, Task<T>> backgroundTaskFactory)
+        {
+            var cancellation = new CancellationTokenSource();
+
+            var backgroundTask = Task.Run(async () =>
+            {
+                try
+                {
+                    return await backgroundTaskFactory(cancellation.Token);
+                }
+                catch (TaskCanceledException)
+                {
+                    return default;
+                }
+            });
+
+            var cancellationTask = userInterface.Select(null, result => (result.Type == PromptType.Cancel, result), cancellation.Token);
+
+            await Task.WhenAny(backgroundTask, cancellationTask);
+            if (!cancellation.IsCancellationRequested)
+            {
+                cancellation.Cancel();
+            }
+
+            await Task.WhenAll(backgroundTask, cancellationTask);
+            return backgroundTask.Result;
+        }
+
+        public static Task RunUntilCancelled(this IMenuContext context, Func<CancellationToken, Task> backgroundTaskFactory)
+        {
+            return context.RunUntilCancelled(async ct =>
+            {
+                await backgroundTaskFactory(ct);
+                return true;
+            });
+        }
+    }
 }
