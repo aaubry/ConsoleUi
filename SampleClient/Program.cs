@@ -92,9 +92,12 @@ namespace SampleClient
             context.SuppressPause();
         }
 
-        public void ChooseB()
+        public async Task ChooseB(IMenuContext context)
         {
-
+            if (await context.UserInterface.Confirm("Perform B ?"))
+            {
+                context.UserInterface.Info("Performing B");
+            }
         }
     }
 

@@ -327,8 +327,18 @@ namespace ConsoleUi.Console
 
                     var result = await ((IMenuUserInterface)this).Select(formattedMessage, choice =>
                     {
-                        var lowerChoice = char.ToLowerInvariant(choice.SelectedCharacter);
-                        return ("yn".Contains(lowerChoice), lowerChoice);
+                        switch (choice.Type)
+                        {
+                            case PromptType.Cancel:
+                                return (true, 'n');
+
+                            case PromptType.Character:
+                                var lowerChoice = char.ToLowerInvariant(choice.SelectedCharacter);
+                                return ("yn".Contains(lowerChoice), lowerChoice);
+
+                            default:
+                                return (false, default);
+                        }
                     });
 
                     return result != 'n';
@@ -345,8 +355,18 @@ namespace ConsoleUi.Console
 
                     var result = await ((IMenuUserInterface)this).Select(formattedMessage, choice =>
                     {
-                        var lowerChoice = char.ToLowerInvariant(choice.SelectedCharacter);
-                        return ("yna".Contains(lowerChoice), lowerChoice);
+                        switch (choice.Type)
+                        {
+                            case PromptType.Cancel:
+                                return (true, 'n');
+
+                            case PromptType.Character:
+                                var lowerChoice = char.ToLowerInvariant(choice.SelectedCharacter);
+                                return ("yna".Contains(lowerChoice), lowerChoice);
+
+                            default:
+                                return (false, default);
+                        }
                     });
 
                     _yesToAll = result == 'a';
@@ -417,6 +437,20 @@ namespace ConsoleUi.Console
                     if (Cons.KeyAvailable)
                     {
                         var key = Cons.ReadKey(true);
+
+                        // Slight delay to ensure that we catch accidental key presses
+                        await Task.Delay(20);
+
+                        // If there are more keys pending, assume that the key press was a mistake
+                        if (Cons.KeyAvailable)
+                        {
+                            // Consume buffered keys to prevent accidental choices
+                            while (!cancellationToken.IsCancellationRequested && Cons.KeyAvailable)
+                            {
+                                Cons.ReadKey(true);
+                            }
+                            continue;
+                        }
 
                         SelectionResult choice;
                         switch (key.Key)
