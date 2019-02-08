@@ -70,9 +70,16 @@ namespace ConsoleUi.Console
                         catch (TaskCanceledException) { }
                     });
 
-                    var page = await pages.GetPage(pageNumber, options.Count, loaderCancellation.Token);
-                    progressCancellation.Cancel();
-                    await progressTask;
+                    Page<IMenuItem> page;
+                    try
+                    {
+                        page = await pages.GetPage(pageNumber, options.Count, loaderCancellation.Token);
+                    }
+                    finally
+                    {
+                        progressCancellation.Cancel();
+                        await progressTask;
+                    }
 
                     if (menu.ExecuteIfSingleItem && page.IsFirstPage && page.Count == 1)
                     {
@@ -211,6 +218,8 @@ namespace ConsoleUi.Console
         protected virtual void Render(IMenu menu, Page<IMenuItem> page, IMenuItem selectedItem, IEnumerable<IMenu> path)
         {
             _yesToAll = false;
+            Cons.BackgroundColor = ConsoleColor.Black;
+            Cons.ForegroundColor = ConsoleColor.Gray;
             Cons.Clear();
 
             using (Color.Set(ConsoleColor.Cyan))

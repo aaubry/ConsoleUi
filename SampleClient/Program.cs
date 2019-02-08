@@ -3,6 +3,7 @@ using ConsoleUi.Console;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SampleClient
@@ -66,6 +67,11 @@ namespace SampleClient
             return new Menu("Many options", Enumerable.Range(0, 100).Select(i => new ActionMenuItem(i.ToString(), ctx => { })));
         }
 
+        public IMenu DelayedException()
+        {
+            return new DelayedExceptionMenu();
+        }
+
         protected override Task<bool> CanExit(IMenuContext context)
         {
             return context.UserInterface.Confirm(true, "Exit ?");
@@ -118,6 +124,30 @@ namespace SampleClient
                         }
                     },
                     () => new ActionMenuItem(ctx => ctx.SuppressPause()),
+                    () => { }
+                );
+            });
+        }
+    }
+
+    public class DelayedExceptionMenu : Menu
+    {
+        public DelayedExceptionMenu() : base("Delayed exception", GetItems())
+        {
+        }
+
+        private static IAsyncEnumerable<IMenuItem> GetItems()
+        {
+            return AsyncEnumerable.CreateEnumerable(() =>
+            {
+                var delay = Task.Delay(500);
+                return AsyncEnumerable.CreateEnumerator<IMenuItem>(
+                    async ct =>
+                    {
+                        await Task.Delay(500);
+                        throw new Exception("Failure!");
+                    },
+                    () => null,
                     () => { }
                 );
             });
