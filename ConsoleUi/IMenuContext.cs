@@ -23,7 +23,16 @@ namespace ConsoleUi
     {
         Task Run(IMenu menu);
         IMenuUserInterface UserInterface { get; }
+
+        /// <summary>
+        /// Suppresses the pause after executing a menu item.
+        /// </summary>
         void SuppressPause();
+
+        /// <summary>
+        /// Indicates that the current menu has become invalid as a result of executing the current item, and needs to be reloaded.
+        /// </summary>
+        void InvalidateMenu();
     }
 
     public static class MenuContextExtensions

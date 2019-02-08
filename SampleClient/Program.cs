@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 
 namespace SampleClient
 {
-    class Program
+    internal class Program
     {
-        static async Task Main(string[] args)
+        private static async Task Main(string[] args)
         {
             var runner = new ConsoleMenuRunner();
             await runner.Run(new MainMenu());
@@ -46,7 +46,7 @@ namespace SampleClient
                 using (var progress = context.UserInterface.StartProgress("Doing stuff..."))
                 {
                     progress.SetIndeterminate();
-                    
+
                     await Task.Delay(10000, ct);
                 }
             });
@@ -66,6 +66,8 @@ namespace SampleClient
         {
             return new Menu("Many options", Enumerable.Range(0, 100).Select(i => new ActionMenuItem(i.ToString(), ctx => { })));
         }
+
+        public IMenu Counter() => new CountingMenu();
 
         public IMenu DelayedException()
         {
@@ -93,6 +95,29 @@ namespace SampleClient
         public void ChooseB()
         {
 
+        }
+    }
+
+    public class CountingMenu : DynamicMenu
+    {
+        private int counter;
+
+        public CountingMenu()
+            : base("Counter")
+        {
+        }
+
+        protected override Task<IEnumerable<IMenuItem>> LoadItems(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new IMenuItem[]
+            {
+                new ActionMenuItem($"Count: {counter}", ctx =>
+                {
+                    ++counter;
+                    ctx.SuppressPause();
+                    ctx.InvalidateMenu();
+                })
+            }.AsEnumerable());
         }
     }
 

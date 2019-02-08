@@ -41,7 +41,20 @@ namespace ConsoleUi.Console
 
             await menu.Enter(new Context(this, path));
 
-            using (var pages = new PaginatedAsyncSequence<IMenuItem>(menu.Items))
+            var pages = new PaginatedAsyncSequence<IMenuItem>(menu.Items);
+
+            async Task ExecuteMenuItemAndRefresh(IMenuItem item)
+            {
+                var context = new Context(this, path);
+                await ExecuteItem(item, context);
+                if (context.MenuInvalidated)
+                {
+                    pages.Dispose();
+                    pages = new PaginatedAsyncSequence<IMenuItem>(menu.Items);
+                }
+            }
+
+            try
             {
                 do
                 {
@@ -83,7 +96,7 @@ namespace ConsoleUi.Console
 
                     if (menu.ExecuteIfSingleItem && page.IsFirstPage && page.Count == 1)
                     {
-                        await ExecuteItem(page[0], new Context(this, path));
+                        await ExecuteMenuItemAndRefresh(page[0]);
                         break;
                     }
 
@@ -123,10 +136,14 @@ namespace ConsoleUi.Console
                         Cons.WriteLine("Running...");
                         Cons.WriteLine();
 
-                        await ExecuteItem(item, new Context(this, path));
+                        await ExecuteMenuItemAndRefresh(item);
                     }
                 }
                 while (!menu.ShouldExit);
+            }
+            finally
+            {
+                pages.Dispose();
             }
         }
 
@@ -577,6 +594,7 @@ namespace ConsoleUi.Console
             private bool? shouldPause;
 
             public bool ShouldPause => shouldPause ?? true;
+            public bool MenuInvalidated { get; private set; }
 
             async Task IMenuContext.Run(IMenu menu)
             {
@@ -590,6 +608,11 @@ namespace ConsoleUi.Console
             void IMenuContext.SuppressPause()
             {
                 shouldPause = false;
+            }
+
+            void IMenuContext.InvalidateMenu()
+            {
+                MenuInvalidated = true;
             }
 
             IMenuUserInterface IMenuContext.UserInterface { get { return menuRunner; } }
