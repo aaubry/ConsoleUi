@@ -74,9 +74,21 @@ namespace SampleClient
             return new DelayedExceptionMenu();
         }
 
+        public IMenu Nested()
+        {
+            return new NestedMenu(10);
+        }
+
         protected override Task<bool> CanExit(IMenuContext context)
         {
             return context.UserInterface.Confirm(true, "Exit ?");
+        }
+    }
+
+    public class NestedMenu : Menu
+    {
+        public NestedMenu(int level) : base($"Depth {level}", level > 0 ? new IMenuItem[] { new NestedMenu(level - 1) } : new IMenuItem[0])
+        {
         }
     }
 

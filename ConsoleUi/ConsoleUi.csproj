@@ -4,14 +4,15 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>ConsoleMenuLib</PackageId>
     <Authors>Antoine Aubry</Authors>
-    <PackageLicenseUrl>https://github.com/aaubry/ConsoleUi/blob/master/COPYING</PackageLicenseUrl>
+    <PackageLicenseUrl></PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/aaubry/ConsoleUi</PackageProjectUrl>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Copyright>Copyright 2017, 2018, 2019</Copyright>
     <PackageTags>Console Menu</PackageTags>
-    <Version>3.2.1</Version>
+    <Version>3.2.2</Version>
     <LangVersion>7.1</LangVersion>
+    <PackageLicenseFile>COPYING</PackageLicenseFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +21,13 @@
 
   <ItemGroup>
     <PackageReference Include="System.Interactive.Async" Version="3.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\COPYING">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>

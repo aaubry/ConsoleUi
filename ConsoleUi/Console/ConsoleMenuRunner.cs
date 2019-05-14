@@ -17,6 +17,7 @@ using ConsoleUi.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Cons = System.Console;
@@ -25,6 +26,11 @@ namespace ConsoleUi.Console
 {
     public class ConsoleMenuRunner : IMenuRunner, IMenuUserInterface
     {
+        static ConsoleMenuRunner()
+        {
+            Cons.OutputEncoding = Encoding.UTF8;
+        }
+
         public Task Run(IMenu menu)
         {
             return Run(menu, new[] { menu });
@@ -243,14 +249,18 @@ namespace ConsoleUi.Console
             {
                 Cons.WriteLine();
 
-                var titleBar = "  " + string.Join(" > ", path.Select(m => m.Title));
-                var maxTitleBarLength = Cons.BufferWidth - 4;
-                if (titleBar.Length > maxTitleBarLength)
-                {
-                    titleBar = "  ... " + titleBar.Substring(titleBar.Length - maxTitleBarLength - 4);
-                }
+                const string titleBarPadding = "  ";
 
-                Cons.WriteLine(titleBar);
+                var maxTitleBarLength = Cons.BufferWidth - titleBarPadding.Length * 2;
+                var titleBar = EllipsedPathVariants(path)
+                    .Select(p => string.Join(" > ", p))
+                    .FirstOrDefault(t => t.Length <= maxTitleBarLength);
+
+                if (titleBar != null)
+                {
+                    Cons.Write(titleBarPadding);
+                    Cons.WriteLine(titleBar);
+                }
 
                 if (menu.Description != null)
                 {
@@ -309,6 +319,26 @@ namespace ConsoleUi.Console
                     Cons.WriteLine("  >  {0}", "Next".PadRight(maxLength + 1));
                 }
             }
+        }
+
+        private IEnumerable<IEnumerable<string>> EllipsedPathVariants(IEnumerable<IMenu> path)
+        {
+            const string ellipsis = "…";
+
+            var segments = path
+                .Select(s => s.Title)
+                .ToList();
+
+            yield return segments;
+
+            for (int i = 2; i < segments.Count; ++i)
+            {
+                yield return new[] { segments[0], ellipsis }.Concat(segments.Skip(i));
+            }
+
+            var lastSegment = segments[segments.Count - 1];
+            yield return new[] { ellipsis, lastSegment };
+            yield return new[] { lastSegment };
         }
 
         protected virtual void RenderMenuItemTitle(IMenuItem item)
