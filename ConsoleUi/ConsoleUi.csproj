@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -10,7 +10,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Copyright>Copyright 2017, 2018, 2019</Copyright>
     <PackageTags>Console Menu</PackageTags>
-    <Version>3.2.2</Version>
+    <Version>3.2.5</Version>
     <LangVersion>7.1</LangVersion>
     <PackageLicenseFile>COPYING</PackageLicenseFile>
   </PropertyGroup>

@@ -79,6 +79,12 @@ namespace SampleClient
             return new NestedMenu(10);
         }
 
+        public IMenu LongTitle()
+        {
+            var longTitle = string.Join("-", Enumerable.Range(10, 99));
+            return new Menu("Long title", Enumerable.Repeat(new ActionMenuItem(longTitle, xtz => { }), 10));
+        }
+
         protected override Task<bool> CanExit(IMenuContext context)
         {
             return context.UserInterface.Confirm(true, "Exit ?");

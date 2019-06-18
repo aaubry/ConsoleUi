@@ -281,7 +281,9 @@ namespace ConsoleUi.Console
             {
                 int index = 0;
 
+                var truncationLength = Cons.BufferWidth - Cons.CursorLeft - 7;
                 maxLength = Math.Max(maxLength, page.Max(i => i.Title.Length));
+
                 foreach (var item in page)
                 {
                     var isMenu = item is IMenu;
@@ -296,7 +298,7 @@ namespace ConsoleUi.Console
                     {
                         Cons.Write(isMenu ? "» " : "  ");
                         var finalLength = Cons.CursorLeft + maxLength + 1;
-                        RenderMenuItemTitle(item);
+                        RenderMenuItemTitle(item, truncationLength);
                         if (finalLength > Cons.CursorLeft)
                         {
                             Cons.Write(new string(' ', finalLength - Cons.CursorLeft));
@@ -321,9 +323,9 @@ namespace ConsoleUi.Console
             }
         }
 
+        const string ellipsis = "…";
         private IEnumerable<IEnumerable<string>> EllipsedPathVariants(IEnumerable<IMenu> path)
         {
-            const string ellipsis = "…";
 
             var segments = path
                 .Select(s => s.Title)
@@ -341,9 +343,15 @@ namespace ConsoleUi.Console
             yield return new[] { lastSegment };
         }
 
-        protected virtual void RenderMenuItemTitle(IMenuItem item)
+        protected virtual void RenderMenuItemTitle(IMenuItem item, int maxLength)
         {
-            Cons.Write(item.Title);
+            var title = item.Title;
+            if (title.Length > maxLength)
+            {
+                title = title.Length > 3 ? $"{title.Substring(0, maxLength - 2)} {ellipsis}" : title.Substring(0, maxLength);
+            }
+
+            Cons.Write(title);
         }
 
         async Task<bool> IMenuUserInterface.Confirm(bool force, string message, params object[] args)
