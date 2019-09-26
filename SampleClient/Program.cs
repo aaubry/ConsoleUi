@@ -149,30 +149,10 @@ namespace SampleClient
             ShouldExit = true;
         }
 
-        private static IAsyncEnumerable<IMenuItem> GetItems()
+        private static async IAsyncEnumerable<IMenuItem> GetItems()
         {
-            return AsyncEnumerable.CreateEnumerable(() =>
-            {
-                var delay = Task.Delay(500);
-                var itemReturned = false;
-                return AsyncEnumerable.CreateEnumerator<IMenuItem>(
-                    async ct =>
-                    {
-                        if (!itemReturned)
-                        {
-                            await delay;
-                            itemReturned = true;
-                            return true;
-                        }
-                        else
-                        {
-                            return false;
-                        }
-                    },
-                    () => new ActionMenuItem(ctx => ctx.SuppressPause()),
-                    () => { }
-                );
-            });
+            await Task.Delay(500);
+            yield return new ActionMenuItem(ctx => ctx.SuppressPause());
         }
     }
 
@@ -182,21 +162,11 @@ namespace SampleClient
         {
         }
 
-        private static IAsyncEnumerable<IMenuItem> GetItems()
+        private static async IAsyncEnumerable<IMenuItem> GetItems()
         {
-            return AsyncEnumerable.CreateEnumerable(() =>
-            {
-                var delay = Task.Delay(500);
-                return AsyncEnumerable.CreateEnumerator<IMenuItem>(
-                    async ct =>
-                    {
-                        await Task.Delay(500);
-                        throw new Exception("Failure!");
-                    },
-                    () => null,
-                    () => { }
-                );
-            });
+            await Task.Delay(500);
+            throw new Exception("Failure!");
+            yield break;
         }
     }
 }

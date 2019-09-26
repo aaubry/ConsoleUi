@@ -20,7 +20,7 @@ using System.Threading.Tasks;
 
 namespace ConsoleUi.Helpers
 {
-    public class PaginatedAsyncSequence<T> : IDisposable
+    public class PaginatedAsyncSequence<T> : IAsyncDisposable
     {
         private readonly List<T> bufferedItems = new List<T>();
         private readonly IAsyncEnumerator<T> enumerator;
@@ -28,7 +28,7 @@ namespace ConsoleUi.Helpers
 
         public PaginatedAsyncSequence(IAsyncEnumerable<T> sequence)
         {
-            enumerator = sequence.GetEnumerator();
+            enumerator = sequence.GetAsyncEnumerator();
         }
 
         public async Task<Page<T>> GetPage(int pageNumber, int pageSize, CancellationToken cancellationToken)
@@ -51,7 +51,7 @@ namespace ConsoleUi.Helpers
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (await enumerator.MoveNext(cancellationToken))
+                if (await enumerator.MoveNextAsync())
                 {
                     bufferedItems.Add(enumerator.Current);
                 }
@@ -74,9 +74,9 @@ namespace ConsoleUi.Helpers
             );
         }
 
-        public void Dispose()
+        public ValueTask DisposeAsync()
         {
-            enumerator.Dispose();
+            return enumerator.DisposeAsync();
         }
     }
 }

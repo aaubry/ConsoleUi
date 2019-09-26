@@ -26,6 +26,7 @@ namespace ConsoleUi
         {
         }
 
+#if NETSTANDARD2_0
         protected override IAsyncEnumerable<IMenuItem> Items => AsyncEnumerable.CreateEnumerable(() =>
         {
             IEnumerator<IMenuItem> enumerator = null;
@@ -43,6 +44,24 @@ namespace ConsoleUi
                 () => enumerator?.Dispose()
             );
         });
+#else
+        protected override IAsyncEnumerable<IMenuItem> Items
+        {
+            get
+            {
+                async IAsyncEnumerable<IMenuItem> GetItems()
+                {
+                    var items = await LoadItems(CancellationToken.None);
+                    foreach (var item in items)
+                    {
+                        yield return item;
+                    }
+                }
+
+                return GetItems();
+            }
+        }
+#endif
 
         protected abstract Task<IEnumerable<IMenuItem>> LoadItems(CancellationToken cancellationToken);
     }

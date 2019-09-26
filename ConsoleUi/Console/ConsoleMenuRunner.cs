@@ -55,7 +55,7 @@ namespace ConsoleUi.Console
                 await ExecuteItem(item, context);
                 if (context.MenuInvalidated)
                 {
-                    pages.Dispose();
+                    await pages.DisposeAsync();
                     pages = new PaginatedAsyncSequence<IMenuItem>(menu.Items);
                 }
             }
@@ -149,7 +149,7 @@ namespace ConsoleUi.Console
             }
             finally
             {
-                pages.Dispose();
+                await pages.DisposeAsync();
             }
         }
 

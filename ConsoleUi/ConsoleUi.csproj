@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
     <PackageId>ConsoleMenuLib</PackageId>
     <Authors>Antoine Aubry</Authors>
     <PackageLicenseUrl></PackageLicenseUrl>
@@ -10,8 +10,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Copyright>Copyright 2017, 2018, 2019</Copyright>
     <PackageTags>Console Menu</PackageTags>
-    <Version>3.2.5</Version>
-    <LangVersion>7.1</LangVersion>
+    <Version>3.3.0</Version>
     <PackageLicenseFile>COPYING</PackageLicenseFile>
   </PropertyGroup>
 
@@ -19,8 +18,9 @@
     <Folder Include="Properties\" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)'=='netstandard2.0'">
     <PackageReference Include="System.Interactive.Async" Version="3.2.0" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.3" />
   </ItemGroup>
 
   <ItemGroup>
